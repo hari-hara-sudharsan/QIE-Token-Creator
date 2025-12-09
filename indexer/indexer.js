@@ -1,17 +1,16 @@
-const { ethers } = require("ethers"); // or: const ethers = require("ethers"); for v6 [web:3][web:8]
-const fs = require("fs"); //[web:7][web:19]
-const dotenv = require("dotenv"); //[web:6][web:12]
-dotenv.config(); //[web:6][web:12]
+const { ethers } = require("ethers");
+const fs = require("fs");
+const dotenv = require("dotenv");
+dotenv.config();
 
-//const { LAUNCHPAD_ABI } = require("../frontend/src/services/launchAbi.js");
-const launchpadABI = require("./LaunchPadABI.json");
-
+// FIXED: correct constant name
+const LAUNCHPAD_ABI = require("./LaunchPadABI.json");
 
 const RPC = process.env.QIE_RPC;
 const LAUNCHPAD_ADDRESS = process.env.LAUNCHPAD_ADDRESS;
 const START_BLOCK = Number(process.env.LAUNCHPAD_START_BLOCK);
 
-const provider = new ethers.JsonRpcProvider(RPC); //[web:1][web:8]
+const provider = new ethers.JsonRpcProvider(RPC);
 
 console.log("Indexer connecting…");
 
@@ -30,14 +29,13 @@ async function main() {
   );
 
   // -------------------------------------------
-  // FETCH PAST EVENTS (in safe batches of 5000)
+  // FETCH PAST EVENTS (BATCH 5000)
   // -------------------------------------------
   let latest = await provider.getBlockNumber();
   let from = START_BLOCK;
 
   while (from < latest) {
     let to = Math.min(from + 5000, latest);
-
     console.log(`Fetching logs: ${from} → ${to}`);
 
     const logs = await provider.getLogs({
@@ -64,8 +62,9 @@ async function main() {
   // -------------------------------------------
   contract.on(
     "Launched",
-    (owner, token, supply, liquidity, months, unlock, event) => {
+    (owner, token, supply, liquidity, months, unlockTime, event) => {
       console.log("New Launch:", token);
+
       saveLaunch(
         {
           owner,
@@ -73,7 +72,7 @@ async function main() {
           totalSupply: supply,
           liquidityQIE: liquidity,
           lockMonths: months,
-          unlockTime: unlock,
+          unlockTime,
         },
         event.transactionHash
       );
@@ -83,6 +82,7 @@ async function main() {
 
 function saveLaunch(data, txHash) {
   const db = JSON.parse(fs.readFileSync("db.json"));
+
   const exists = db.tokens.find(
     (x) => x.tokenAddress.toLowerCase() === data.token.toLowerCase()
   );
@@ -104,4 +104,3 @@ function saveLaunch(data, txHash) {
 }
 
 main().catch(console.error);
-
